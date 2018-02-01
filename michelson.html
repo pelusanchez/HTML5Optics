@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Michelson Interferometer Simulation</title>
+    <style type="text/css">
+        .slier {
+            width:300px;
+        }
+    </style>
+	<script type="text/javascript">
+        'use strict';
+        var michelson = michelson||{};
+        michelson.data = {
+        	wavelength: 7000,
+            screenDistance: 1,
+        	d: 70000,            // Distance mirror 1 to beamSplitte
+        	d2: 0,            // Distance mirror 2 to beamSplitte
+        	n: 1,
+        	intensity1: 1,    // Intensity mirror 1
+        	intensity2: 1     // Intensity mirror 2
+        }
+		/**
+		 *	Introducir la longitud de onda en Angstrons
+		 */
+		michelson.setWavelength=function(wavelength){
+            michelson.data.wavelength=wavelength;
+		}
+
+		/**
+		 *	Set distance between mirrors in Amstrons
+		 */
+		michelson.setDistanceBetweenMirrors=function(distance){
+			michelson.data.d=distance;
+		}
+
+        /**
+         *  Set distance beam-splitter to Screen (in Meters!)
+         */
+        michelson.setDistanceOfScreen=function(distance){
+            if(distance>10 || distance < 0.1){
+                return 0;
+            }
+            michelson.data.screenDistance=distance;
+        }
+
+
+		michelson.getAngleForMaxK=function(k){
+			var arg=2*michelson.data.d*michelson.data.n;
+			arg=k*michelson.data.wavelength/arg;
+			
+			return Math.acos(arg);
+		}
+
+        // Return the intensity (Normalized 0(MIN)-1(MAX)), where phase is the diference between rays (2*pi/lambda*(PATH DIFERENCE))
+		michelson.getIntensityNormal=function(phase){
+            var maxi=michelson.data.intensity1+michelson.data.intensity2+2*Math.sqrt(michelson.data.intensity1*michelson.data.intensity2);
+            return (michelson.data.intensity1+michelson.data.intensity2+2*Math.sqrt(michelson.data.intensity1*michelson.data.intensity2)*Math.cos(phase))/maxi;
+		}
+
+        // Return the HUE of the wavelength (Aproximated!)
+        michelson.getWavelengthHue = function(wavelength){
+            // 400 -> Blue
+            // 700 -> Red
+            if(wavelength>7000){
+                return 0;
+            }
+            if(wavelength<3500){
+                return 300;
+            }
+
+            return 300-300*(wavelength-3500)/(7000-3500);
+
+        }
+
+
+        // Draw in a Canvas Object the pattern
+
+		michelson.drawScreen=function(canvas){
+            var ctx=canvas.getContext("2d");
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+			
+            var intensity = 0;
+
+            var widthAngle=Math.atan(michelson.data.screenDistance); // Get the angle Width (ATAN (/ DISTANCE SCREEN-BEAMSPLITTER/SCREENWIDTH/2)))
+            var step=widthAngle/canvas.width*0.6;
+
+            var factor = canvas.width/widthAngle;
+            var wavelength_color=michelson.getWavelengthHue(michelson.data.wavelength);
+            
+            var mid=(canvas.width>canvas.height)? canvas.height : canvas.width;
+            mid/=2;
+
+			for(var i=0; i<widthAngle;i+=step){
+
+                intensity=michelson.getIntensityNormal(2*Math.PI/michelson.data.wavelength*2*michelson.data.d*michelson.data.n*Math.cos(i));
+                ctx.beginPath();
+                ctx.strokeStyle="hsl("+wavelength_color+",100%,"+intensity*50+"%)";
+                ctx.arc(mid,mid,i*factor,0,2*Math.PI);
+                ctx.stroke();
+			}
+		}
+
+        // Draw the mount of the interferometer in a Canvas Object
+        michelson.drawMount=function(canvas){
+            var ctx=canvas.getContext("2d");
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            ctx.lineWidth=3;
+            ctx.strokeStyle="#000000";
+
+            // Beam Splitter
+            ctx.beginPath();
+            ctx.moveTo(canvas.width*0.5-20,canvas.height*0.5-20);
+            ctx.lineTo(canvas.width*0.5+20,canvas.height*0.5+20);
+            ctx.stroke();
+
+            // Screen
+            ctx.beginPath();
+            ctx.moveTo(canvas.width*0.5-100,10);
+            ctx.lineTo(canvas.width*0.5+100,10);
+            ctx.stroke();
+
+            // Emitter
+            ctx.beginPath();
+            ctx.moveTo(canvas.width*0.01,canvas.height*0.5-20);
+            ctx.lineTo(canvas.width*0.1,canvas.height*0.5-20);
+            ctx.lineTo(canvas.width*0.1,canvas.height*0.5+20);
+            ctx.lineTo(canvas.width*0.01,canvas.height*0.5+20);
+            ctx.lineTo(canvas.width*0.01,canvas.height*0.5-20);
+            ctx.stroke();
+
+
+            // Mirror 1 (RIGHT)
+            ctx.beginPath();
+            ctx.moveTo(canvas.width*(0.7+0.0000029*michelson.data.d),canvas.height*0.5-50);
+            ctx.lineTo(canvas.width*(0.7+0.0000029*michelson.data.d),canvas.height*0.5+50);
+            ctx.stroke();
+
+            // Mirror 2 (BOTTOM)
+            ctx.beginPath();
+            ctx.moveTo(canvas.width*0.5-50,canvas.height*0.7);
+            ctx.lineTo(canvas.width*0.5+50,canvas.height*0.7);
+            ctx.stroke();
+
+
+            ctx.lineWidth=2;
+
+            // BEAM
+            var wavelength_color=michelson.getWavelengthHue(michelson.data.wavelength);
+            
+            ctx.beginPath();
+            ctx.strokeStyle="hsl("+wavelength_color+",100%,50%)";
+            ctx.moveTo(canvas.width*0.1,canvas.height*0.5);
+            ctx.lineTo(canvas.width*(0.7+0.0000029*michelson.data.d),canvas.height*0.5);
+            ctx.moveTo(canvas.width*0.5,canvas.height*0.7);
+            ctx.lineTo(canvas.width*0.5,10);
+            ctx.stroke();
+
+
+
+        }
+
+        michelson.changeD=function(d){
+            michelson.setDistanceBetweenMirrors(d);
+            
+
+        }
+
+        michelson.update=function(){
+            michelson.drawMount(document.getElementById("mount"));
+            michelson.drawScreen(document.getElementById("screen"));
+        }
+
+        window.onload=function(){
+            document.getElementById("slider_d").addEventListener("input",function(){
+                 document.getElementById("slider_d_value").innerText=""+this.value+"A";
+                 michelson.changeD(this.value);
+                 michelson.update();
+            });
+            document.getElementById("slider_wavelength").addEventListener("input",function(){
+                 document.getElementById("slider_wavelength_value").innerText=""+this.value+"A";
+                 michelson.setWavelength(this.value);
+                 michelson.update();
+            });
+            document.getElementById("slider_mirrorDistance").addEventListener("input",function(){
+                var distance=parseInt(this.value*10)/100;
+                document.getElementById("slider_mirrorDistance_value").innerText=""+distance+"m";
+                michelson.setDistanceOfScreen(distance);
+                michelson.update();
+            });
+            
+            michelson.update();
+        }
+
+        function manualValue(id){
+            var value=prompt("Introducir valor (unidades: m, cm, mm, nm, A)");
+            var angstrong;
+            var factor="m,cm,mm,nm,A".split(",");
+            if(isNaN(value[value.length-1])){
+                var unit=""+value[value.length-1];
+                angstrong=parseFloat(value.substring(0, value.length-1));
+                if(isNaN(value[value.length-2])){
+                    unit=value[value.length-2]+unit;
+                    angstrong=parseFloat(value.substring(0, value.length-2));
+                }
+
+                var f=factor.indexOf(unit);
+                console.log("UNIT index:"+f);
+                if(f>-1){
+                    
+                    switch(f){
+                        case 0:
+                            angstrong*=1000000000;
+                        break;
+                        case 1:
+                            angstrong*=10000000;
+                        break;
+                        case 2:
+                            angstrong*=1000000;
+                        break;
+                        case 3:
+                            angstrong*=10;
+                        break;
+                    }
+                }else{
+                    return;
+                }
+
+
+            }else{
+                angstrong=value;
+            }
+            document.getElementById(id).value=angstrong;
+            document.getElementById(id).input();
+        }
+        michelson.fsTags = (function(){
+            var _tag = {};
+            if(document.exitFullscreen){
+                _tag["request"] = "requestFullscreen";
+                _tag["exit"] = "exitFullscreen";
+                _tag["element"] = "fullscreenElement";
+            }else if(document.webkitExitFullscreen){
+                _tag["request"] = "webkitRequestFullscreen";
+                _tag["exit"] = "webkitExitFullscreen";
+                _tag["element"] = "webkitFullscreenElement";
+            }else if(document.webkitCancelFullScreen){
+                _tag["request"] = "webkitRequestFullScreen";
+                _tag["exit"] = "webkitCancelFullscreen";
+                _tag["element"] = "webkitCurrentFullScreenElement";
+            }else if(document.mozCancelFullScreen){
+                _tag["request"] = "mozRequestFullscreen";
+                _tag["exit"] = "mozCancelFullScreen";
+                _tag["element"] = "mozFullScreenElement";
+            }else if(document.msExitFullscreen){
+                _tag["request"] = "msRequestFullscreen";
+                _tag["exit"] = "msExitFullscreen";
+                _tag["element"] = "msFullscreenElement";
+            }
+            return _tag;
+        })();
+
+        function fullScreen(elmName){
+            document.getElementById(elmName)[michelson.fsTags["request"]]();
+            document.getElementById(elmName).width=window.screen.width;
+            document.getElementById(elmName).height=window.screen.height;
+            michelson.update();
+        }
+	</script>
+</head>
+<body>
+<canvas id="screen" width="600" height="600"></canvas>
+<canvas id="mount" width="600" height="600"></canvas>
+<div id="control">
+    <table border="0">
+        <tr><td><span id="slider_wavelength_text">Longitud de onda: </span></td><td><input type="range" min="1" max="10000" value="7000" class="slider" id="slider_wavelength"></div></td><td><span id="slider_wavelength_value">7000A</span>
+        <tr><td><span id="slider_d_text">Distancia entre espejos: </span></td><td><input type="range" min="0" max="100000" value="70000" class="slider" id="slider_d"></div></td><td><span id="slider_d_value" onClick="manualValue('slider_d')">70000A</span></td></tr>
+        <tr><td><span id="slider_mirrorDistance_text">Distancia de la pantalla: </span></td><td><input type="range" min="1" max="100" value="10" class="slider" id="slider_mirrorDistance"></div></td><td><span id="slider_mirrorDistance_value">1m</span></td></tr>
+    </table>
+</div>
+</body>
+</html>
